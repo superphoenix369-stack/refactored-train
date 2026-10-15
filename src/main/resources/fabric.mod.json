@@ -1,0 +1,21 @@
+{
+	"schemaVersion": 1,
+	"id": "custommusic",
+	"version": "${version}",
+	"name": "Custom Music",
+	"description": "Choose which music is allowed to play, and add your own .ogg tracks.",
+	"authors": [],
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.custommusic.CustomMusicClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
