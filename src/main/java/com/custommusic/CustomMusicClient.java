@@ -30,7 +30,7 @@ public final class CustomMusicClient implements ClientModInitializer {
 		KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main"));
 		openKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 			"key.custommusic.open",
-			InputConstants.Type.KEYSYM,
+			InputConstants.Type.KEYBOARD,
 			InputConstants.KEY_M,
 			category
 		));
