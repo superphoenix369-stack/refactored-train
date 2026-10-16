@@ -30,6 +30,9 @@ public final class PackWriter {
 	/** Namespace used for the copied tracks. Deliberately different from the mod id so the pack can be detected. */
 	public static final String NAMESPACE = "custommusic_user";
 
+	/** How the game identifies a folder pack inside resourcepacks/. */
+	public static final String PACK_ID = "file/" + MusicConfig.PACK_FOLDER;
+
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	/** Only used if vanilla's sounds.json could not be read: custom tracks are added, vanilla is untouched. */
