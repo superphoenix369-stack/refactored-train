@@ -3,6 +3,7 @@ package com.custommusic;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -13,13 +14,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Layout, top to bottom: tabs, a fixed row of artist buttons (arrows scroll through the artists),
+ * Layout, top to bottom: a search box, tabs, a fixed row of artist buttons (arrows scroll through the artists),
  * then the song list, sorted by artist. An artist button allows or blocks all of that artist's songs.
  * A green check means the song may play, a red cross means it is blocked.
  * "Apply" writes the resource pack and asks the game to reload resources.
  */
 public final class MusicScreen extends Screen {
 	private static final int ROW_HEIGHT = 22;
+	private static final int SEARCH_Y = 8;
 	private static final int ARTIST_ROW_Y = 54;
 	private static final int LIST_TOP = 80;
 	private static final int MAX_ROWS = 7;
@@ -41,9 +43,17 @@ public final class MusicScreen extends Screen {
 
 	private VanillaCatalog catalog = new VanillaCatalog();
 	private List<VanillaSong> vanillaSongs = List.of();
-	private List<ArtistGroup> vanillaArtists = List.of();
 	private List<CustomTracks.Found> customTracks = List.of();
-	private List<ArtistGroup> customArtists = List.of();
+
+	// What the search currently lets through (recomputed on every rebuild). Artist buttons act on these.
+	private List<VanillaSong> shownVanilla = List.of();
+	private List<ArtistGroup> shownVanillaArtists = List.of();
+	private List<CustomTracks.Found> shownCustom = List.of();
+	private List<ArtistGroup> shownCustomArtists = List.of();
+
+	/** Created once and re-added on every rebuild, so typing keeps its cursor and focus. */
+	private EditBox searchBox;
+	private String query = "";
 	private boolean packActive = true;
 
 	private boolean showCustom = true;
@@ -68,9 +78,6 @@ public final class MusicScreen extends Screen {
 		}
 		songs.sort(Comparator.comparing(VanillaSong::info, TrackNames.ORDER).thenComparing(VanillaSong::name));
 		this.vanillaSongs = songs;
-		this.vanillaArtists = ArtistGroup.group(songs.stream()
-			.map(song -> new ArtistGroup.Member(song.name(), song.info()))
-			.toList());
 
 		rescanCustom();
 	}
@@ -84,9 +91,6 @@ public final class MusicScreen extends Screen {
 			.comparing((CustomTracks.Found track) -> TrackNames.forCustom(track.name()), TrackNames.ORDER)
 			.thenComparing(CustomTracks.Found::id));
 		this.customTracks = sorted;
-		this.customArtists = ArtistGroup.group(sorted.stream()
-			.map(track -> new ArtistGroup.Member(track.id(), TrackNames.forCustom(track.name())))
-			.toList());
 
 		Map<String, MusicConfig.CustomEntry> merged = new LinkedHashMap<>();
 		for (CustomTracks.Found track : customTracks) {
@@ -116,7 +120,24 @@ public final class MusicScreen extends Screen {
 	}
 
 	private int songCount() {
-		return showCustom ? customTracks.size() : vanillaSongs.size();
+		return showCustom ? shownCustom.size() : shownVanilla.size();
+	}
+
+	/** Applies the search text to both tabs and regroups the artists from what is left. */
+	private void refreshView() {
+		shownVanilla = vanillaSongs.stream()
+			.filter(song -> TrackNames.matches(song.info(), query))
+			.toList();
+		shownVanillaArtists = ArtistGroup.group(shownVanilla.stream()
+			.map(song -> new ArtistGroup.Member(song.name(), song.info()))
+			.toList());
+
+		shownCustom = customTracks.stream()
+			.filter(track -> TrackNames.matches(TrackNames.forCustom(track.name()), query))
+			.toList();
+		shownCustomArtists = ArtistGroup.group(shownCustom.stream()
+			.map(track -> new ArtistGroup.Member(track.id(), TrackNames.forCustom(track.name())))
+			.toList());
 	}
 
 	private int pageCount() {
@@ -142,10 +163,32 @@ public final class MusicScreen extends Screen {
 	}
 
 	private void buildWidgets() {
+		boolean searchHadFocus = searchBox != null && searchBox.isFocused();
+		refreshView();
 		this.clearWidgets();
 		page = Math.max(0, Math.min(page, pageCount() - 1));
 
 		int left = this.width / 2 - 155;
+
+		// Search box (the same instance every time).
+		if (searchBox == null) {
+			searchBox = new EditBox(this.font, left, SEARCH_Y, LIST_WIDTH, 18, Component.literal("Search"));
+			searchBox.setMaxLength(40);
+			searchBox.setResponder(text -> {
+				if (!text.equals(query)) {
+					query = text;
+					page = 0;
+					artistOffset = 0;
+					buildWidgets();
+				}
+			});
+		}
+		searchBox.setPosition(left, SEARCH_Y);
+		searchBox.setWidth(LIST_WIDTH);
+		addRenderableWidget(searchBox);
+		if (searchHadFocus) {
+			this.setFocused(searchBox);
+		}
 
 		// Tabs and the master switch for vanilla music.
 		addRenderableWidget(Button.builder(Component.literal(showCustom ? "[Your tracks]" : "Your tracks"), b -> {
@@ -213,7 +256,7 @@ public final class MusicScreen extends Screen {
 
 	/** The fixed row of artist buttons under the tabs: [<] [artist] [artist] ... [>]. */
 	private void buildArtistRow() {
-		List<ArtistGroup> artists = showCustom ? customArtists : vanillaArtists;
+		List<ArtistGroup> artists = showCustom ? shownCustomArtists : shownVanillaArtists;
 		if (artists.isEmpty()) return;
 
 		int rowLeft = this.width / 2 - listWidth() / 2;
@@ -285,9 +328,9 @@ public final class MusicScreen extends Screen {
 			int x = listLeft + (i / rows) * (LIST_WIDTH + 10);
 			int y = LIST_TOP + (i % rows) * ROW_HEIGHT;
 			if (showCustom) {
-				addCustomSong(customTracks.get(start + i), x, y);
+				addCustomSong(shownCustom.get(start + i), x, y);
 			} else {
-				addVanillaSong(vanillaSongs.get(start + i), x, y);
+				addVanillaSong(shownVanilla.get(start + i), x, y);
 			}
 		}
 	}
@@ -354,13 +397,19 @@ public final class MusicScreen extends Screen {
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
 		super.extractRenderState(graphics, mouseX, mouseY, delta);
 
-		drawCentered(graphics, this.title.getString(), 12, 0xFFFFFFFF);
+		if (query.isEmpty() && !searchBox.isFocused()) {
+			graphics.text(this.font, "Search songs or artists...", this.width / 2 - 155 + 6, SEARCH_Y + 5, 0xFF808080, false);
+		}
 		drawCentered(graphics, "Page " + (page + 1) + " / " + pageCount(), this.height - 48, 0xFFAAAAAA);
 
 		if (showCustom && customTracks.isEmpty()) {
 			drawCentered(graphics, "No .ogg files found yet.", LIST_TOP + 10, 0xFFFFFFFF);
 			drawCentered(graphics, "Press 'Open folder', drop Ogg Vorbis files in, then press Rescan.", LIST_TOP + 24, 0xFFAAAAAA);
 			drawCentered(graphics, "Tip: name files like 'Artist - Title.ogg' to sort and label them.", LIST_TOP + 38, 0xFFAAAAAA);
+		}
+		boolean listHasSongs = showCustom ? !customTracks.isEmpty() : !vanillaSongs.isEmpty();
+		if (listHasSongs && songCount() == 0) {
+			drawCentered(graphics, "No songs match your search.", LIST_TOP + 10, 0xFFFFFFFF);
 		}
 		if (!showCustom && vanillaSongs.isEmpty()) {
 			drawCentered(graphics, "Could not read the vanilla music list (see the game log).", LIST_TOP + 10, 0xFFFF5555);
