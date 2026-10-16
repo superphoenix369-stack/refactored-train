@@ -68,7 +68,7 @@ public final class CustomMusicClient implements ClientModInitializer {
 					"Then, in Minecraft:",
 					"  1. Press M (or whatever you bound it to) to open the Custom Music screen.",
 					"  2. Press Rescan, choose where each track may play, and press Apply.",
-					"  3. First time only: Options > Resource Packs > enable the pack named CustomMusic.",
+					"  3. Apply turns on the CustomMusic resource pack for you. If the screen says it could not, enable it under Options > Resource Packs.",
 					"",
 					"Convert other formats with ffmpeg, for example:",
 					"  ffmpeg -i song.mp3 -c:a libvorbis -q:a 5 song.ogg",
