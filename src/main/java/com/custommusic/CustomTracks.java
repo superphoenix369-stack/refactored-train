@@ -17,8 +17,11 @@ import java.util.stream.Stream;
 public final class CustomTracks {
 	private CustomTracks() {}
 
-	/** A usable track: {@code id} is a resource-safe name, {@code file} the original file. */
-	public record Found(String id, Path file) {}
+	/**
+	 * A usable track: {@code id} is a resource-safe name, {@code file} the original file and
+	 * {@code name} the original file name without ".ogg" (this is what the player sees).
+	 */
+	public record Found(String id, Path file, String name) {}
 
 	public record Result(List<Found> tracks, List<String> skipped) {}
 
@@ -46,9 +49,10 @@ public final class CustomTracks {
 				skipped.add(name);
 				continue;
 			}
-			String id = uniqueId(sanitize(name.substring(0, name.length() - ".ogg".length())), usedIds);
+			String baseName = name.substring(0, name.length() - ".ogg".length());
+			String id = uniqueId(sanitize(baseName), usedIds);
 			usedIds.add(id);
-			found.add(new Found(id, file));
+			found.add(new Found(id, file, baseName));
 		}
 		return new Result(found, skipped);
 	}
