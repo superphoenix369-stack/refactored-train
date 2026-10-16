@@ -75,6 +75,7 @@ public final class PackWriter {
 		}
 
 		Files.writeString(minecraftDir.resolve("sounds.json"), GSON.toJson(root), StandardCharsets.UTF_8);
+		writeLang(pack, active);
 		return new Result(active.size(), root.size(), fallback);
 	}
 
@@ -113,6 +114,20 @@ public final class PackWriter {
 		sound.addProperty("name", name);
 		sound.addProperty("stream", true); // music is streamed from disk instead of fully loaded into memory
 		return sound;
+	}
+
+	/**
+	 * Gives the "Now playing" toast a proper name for custom tracks. The game looks the name up under the
+	 * sound's resource id with separators turned into dots, e.g. custommusic_user.my_song.
+	 */
+	private static void writeLang(Path pack, List<CustomTracks.Found> active) throws IOException {
+		Path langDir = pack.resolve("assets").resolve(NAMESPACE).resolve("lang");
+		Files.createDirectories(langDir);
+		JsonObject lang = new JsonObject();
+		for (CustomTracks.Found track : active) {
+			lang.addProperty(NAMESPACE + "." + track.id(), TrackNames.forCustom(track.name()).title());
+		}
+		Files.writeString(langDir.resolve("en_us.json"), GSON.toJson(lang), StandardCharsets.UTF_8);
 	}
 
 	private static void writePackMeta(Path pack) throws IOException {
