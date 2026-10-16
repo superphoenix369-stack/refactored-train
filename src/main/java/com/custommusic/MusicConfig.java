@@ -42,9 +42,11 @@ public final class MusicConfig {
 		return FabricLoader.getInstance().getGameDir().resolve("custom_music");
 	}
 
-	/** The generated resource pack folder (inside the normal resourcepacks folder). */
+	/** Folder name of the generated resource pack (inside the normal resourcepacks folder). */
+	public static final String PACK_FOLDER = "CustomMusic";
+
 	public static Path packDir() {
-		return FabricLoader.getInstance().getGameDir().resolve("resourcepacks").resolve("CustomMusic");
+		return FabricLoader.getInstance().getGameDir().resolve("resourcepacks").resolve(PACK_FOLDER);
 	}
 
 	private static Path file() {
