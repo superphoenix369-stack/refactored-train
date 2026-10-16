@@ -382,6 +382,8 @@ public final class MusicScreen extends Screen {
 			PackWriter.Result result = PackWriter.write(config, catalog, customTracks);
 			if (result.usedFallback()) {
 				status = "Could not read vanilla music, so only your tracks were added. See the log.";
+			} else if (!Platform.enablePack(PackWriter.PACK_ID)) {
+				status = "Applied, but enable the 'CustomMusic' pack in Options > Resource Packs.";
 			} else if (Platform.reloadResources()) {
 				status = "Applied " + result.tracksCopied() + " custom track(s). Reloading resources...";
 			} else {
