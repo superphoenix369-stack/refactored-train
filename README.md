@@ -7,41 +7,7 @@ Client-side mod that lets you:
 
 Your tracks join vanilla's own music rotation, so menu/creative/dimension/biome logic keeps working.
 
-## Build the jar on GitHub (no local setup)
-
-1. Create a new repository on github.com and upload the **contents** of this folder
-   (so `build.gradle`, `src/` and `.github/` are at the top level of the repo).
-   Make sure the hidden `.github` folder is included.
-2. Open the repo's **Actions** tab. The build starts automatically on every push to `main`
-   (or press **Run workflow** under "Build mod jar").
-3. When the run finishes (a few minutes), open it and download **custommusic-jar** from the
-   *Artifacts* section at the bottom. Unzip it to get `custommusic-1.0.0.jar`.
-4. Optional: push a tag such as `v1.0.0` and the jar is also attached to a GitHub **Release**.
-
-If the run fails, open it and click the red step. The error text is what to send me.
-The workflow installs Java 25 and the latest Gradle itself, so no Gradle wrapper is needed.
-
-## Build locally
-
-Requirements: **JDK 25**, internet access for Gradle.
-
-```
-gradle wrapper          # once, only if there is no ./gradlew yet (needs Gradle 9.x installed)
-./gradlew build         # Windows: gradlew.bat build
-```
-
-The jar ends up in `build/libs/custommusic-1.0.0.jar`.
-
-No Gradle wrapper is bundled. Easiest alternative: generate a fresh project at
-<https://fabricmc.net/develop/template/> (Minecraft 26.3), then copy this project's `src/` folder
-over the generated `src/` and copy the values from `gradle.properties` if the template differs.
-
-## Install
-
-Put the jar in `.minecraft/mods/` with **Fabric Loader 0.19.5+** and **Fabric API for 26.3**
-(Java 25).
-
-## Use
+Use
 
 1. Launch the game and press **M** (rebindable under Controls > Custom Music). It also works on the
    title screen and the pause menu.
@@ -79,14 +45,3 @@ Because it relies only on standard resource pack behaviour, it needs almost no M
 - This was written against the Minecraft 26.2/26.3 API surface (Mojang names, `GuiGraphicsExtractor`,
   `KeyMappingHelper`, `Identifier`) but could not be compiled against the real game in the environment it was
   written in. See the project notes below for the lines most likely to need a tweak.
-
-## If the build fails
-
-Most likely spots, in order:
-
-1. `MusicScreen.java`: the `GuiGraphicsExtractor` import (expected `net.minecraft.client.gui.GuiGraphicsExtractor`).
-2. `CustomMusicClient.java`: `ScreenEvents` / `ScreenKeyboardEvents` imports (expected `net.fabricmc.fabric.api.client.screen.v1`).
-3. `VanillaCatalog.java` / `Platform.java`: `getResourceStack`, `openAsReader`, `getNamespaces` on `ResourceManager`/`Resource`.
-4. `gradle.properties`: `loom_version` and `fabric_api_version`. Copy the current values from the template generator.
-
-Each is a one-line fix; the logic around them does not depend on version details.
