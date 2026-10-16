@@ -13,8 +13,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Two paged lists, both sorted by artist: your own tracks (toggle + where each plays) and vanilla
- * tracks (toggle). A green check means the song may play, a red cross means it is blocked.
+ * Two paged lists, both sorted by artist, with a clickable header above each artist's songs:
+ * your own tracks (toggle + where each plays) and vanilla tracks (toggle).
+ * A green check means the song may play, a red cross means it is blocked.
  * "Apply" writes the resource pack and asks the game to reload resources.
  */
 public final class MusicScreen extends Screen {
@@ -26,15 +27,30 @@ public final class MusicScreen extends Screen {
 	// Legacy formatting codes are written as escapes so the source file never depends on its encoding.
 	private static final String GREEN_CHECK = "\u00a7a\u2714\u00a7r ";
 	private static final String RED_CROSS = "\u00a7c\u2718\u00a7r ";
+	private static final String YELLOW_MIXED = "\u00a7e~\u00a7r ";
 	private static final String GRAY = "\u00a77";
+	private static final String BOLD = "\u00a7l";
+	private static final String RESET = "\u00a7r";
 
-	private record VanillaRow(String name, TrackNames.Info info) {}
+	/** One line in a list: an artist header or a song. */
+	private interface Entry {}
+
+	/** Clicking it allows (or, if everything is already allowed, blocks) every song by this artist. */
+	private record Header(String artist, List<String> keys, boolean custom) implements Entry {}
+
+	private record VanillaSong(String name, TrackNames.Info info) implements Entry {}
+
+	private record CustomSong(CustomTracks.Found track) implements Entry {}
+
+	/** Sorted item before headers are added. {@code key} is the vanilla track name or the custom track id. */
+	private record Item(String key, TrackNames.Info info, Entry entry) {}
 
 	private final Screen parent;
 	private final MusicConfig config = MusicConfig.load();
 
 	private VanillaCatalog catalog = new VanillaCatalog();
-	private List<VanillaRow> vanillaRows = List.of();
+	private List<Entry> vanillaEntries = List.of();
+	private List<Entry> customEntries = List.of();
 	private List<CustomTracks.Found> customTracks = List.of();
 	private boolean packActive = true;
 
@@ -53,12 +69,13 @@ public final class MusicScreen extends Screen {
 		this.catalog = VanillaCatalog.scan(resources);
 		this.packActive = Platform.packActive(resources);
 
-		List<VanillaRow> rows = new ArrayList<>();
+		List<Item> items = new ArrayList<>();
 		for (String name : catalog.tracks) {
-			rows.add(new VanillaRow(name, TrackNames.forVanilla(name)));
+			TrackNames.Info info = TrackNames.forVanilla(name);
+			items.add(new Item(name, info, new VanillaSong(name, info)));
 		}
-		rows.sort(Comparator.comparing(VanillaRow::info, TrackNames.ORDER).thenComparing(VanillaRow::name));
-		this.vanillaRows = rows;
+		items.sort(Comparator.comparing(Item::info, TrackNames.ORDER).thenComparing(Item::key));
+		this.vanillaEntries = withHeaders(items, false);
 
 		rescanCustom();
 	}
@@ -66,19 +83,40 @@ public final class MusicScreen extends Screen {
 	/** Reads the custom_music folder and keeps saved settings for tracks that are still there. */
 	private int rescanCustom() {
 		CustomTracks.Result result = CustomTracks.scan(MusicConfig.musicDir());
-
-		List<CustomTracks.Found> sorted = new ArrayList<>(result.tracks());
-		sorted.sort(Comparator
-			.comparing((CustomTracks.Found track) -> TrackNames.forCustom(track.name()), TrackNames.ORDER)
-			.thenComparing(CustomTracks.Found::id));
-		this.customTracks = sorted;
+		this.customTracks = result.tracks();
 
 		Map<String, MusicConfig.CustomEntry> merged = new LinkedHashMap<>();
+		List<Item> items = new ArrayList<>();
 		for (CustomTracks.Found track : customTracks) {
 			merged.put(track.id(), config.custom.getOrDefault(track.id(), new MusicConfig.CustomEntry()));
+			items.add(new Item(track.id(), TrackNames.forCustom(track.name()), new CustomSong(track)));
 		}
 		config.custom = merged;
+
+		items.sort(Comparator.comparing(Item::info, TrackNames.ORDER).thenComparing(Item::key));
+		this.customEntries = withHeaders(items, true);
 		return result.skipped().size();
+	}
+
+	/** Puts an artist header in front of each run of songs by the same artist. Items must already be sorted. */
+	private static List<Entry> withHeaders(List<Item> items, boolean custom) {
+		List<Entry> out = new ArrayList<>();
+		int i = 0;
+		while (i < items.size()) {
+			String artist = items.get(i).info().artist();
+			List<String> keys = new ArrayList<>();
+			int j = i;
+			while (j < items.size() && items.get(j).info().artist().equalsIgnoreCase(artist)) {
+				keys.add(items.get(j).key());
+				j++;
+			}
+			out.add(new Header(artist, keys, custom));
+			for (int k = i; k < j; k++) {
+				out.add(items.get(k).entry());
+			}
+			i = j;
+		}
+		return out;
 	}
 
 	@Override
@@ -96,18 +134,29 @@ public final class MusicScreen extends Screen {
 		return !showCustom && this.width >= 660 ? 2 : 1;
 	}
 
-	private int perPage() {
-		return rows() * columns();
+	private List<List<ListLayout.Placed<Entry>>> pages() {
+		List<Entry> entries = showCustom ? customEntries : vanillaEntries;
+		return ListLayout.pages(entries, e -> e instanceof Header, rows(), rows() * columns());
 	}
 
-	private int pageCount() {
-		int total = showCustom ? customTracks.size() : vanillaRows.size();
-		return Math.max(1, (total + perPage() - 1) / perPage());
+	private boolean isAllowed(boolean custom, String key) {
+		return custom ? config.custom.get(key).enabled : !config.disabledVanilla.contains(key);
+	}
+
+	private void setAllowed(boolean custom, String key, boolean allowed) {
+		if (custom) {
+			config.custom.get(key).enabled = allowed;
+		} else if (allowed) {
+			config.disabledVanilla.remove(key);
+		} else {
+			config.disabledVanilla.add(key);
+		}
 	}
 
 	private void buildWidgets() {
 		this.clearWidgets();
-		page = Math.max(0, Math.min(page, pageCount() - 1));
+		List<List<ListLayout.Placed<Entry>>> pages = pages();
+		page = Math.max(0, Math.min(page, pages.size() - 1));
 
 		int left = this.width / 2 - 155;
 
@@ -129,11 +178,7 @@ public final class MusicScreen extends Screen {
 			buildWidgets();
 		}).bounds(left + 210, 30, 100, 20).build());
 
-		if (showCustom) {
-			buildCustomRows(left);
-		} else {
-			buildVanillaRows();
-		}
+		buildList(pages.get(page));
 
 		// Paging.
 		int navY = this.height - 54;
@@ -148,7 +193,7 @@ public final class MusicScreen extends Screen {
 			page++;
 			buildWidgets();
 		}).bounds(left + 240, navY, 70, 20).build();
-		next.active = page < pageCount() - 1;
+		next.active = page < pages.size() - 1;
 		addRenderableWidget(next);
 
 		// Actions.
@@ -175,45 +220,68 @@ public final class MusicScreen extends Screen {
 			.bounds(left + 234, actionY, 76, 20).build());
 	}
 
-	private void buildCustomRows(int left) {
-		int start = page * perPage();
-		for (int i = 0; i < perPage() && start + i < customTracks.size(); i++) {
-			CustomTracks.Found track = customTracks.get(start + i);
-			MusicConfig.CustomEntry entry = config.custom.get(track.id());
-			int y = LIST_TOP + i * ROW_HEIGHT;
-
-			addRenderableWidget(Button.builder(Component.literal(label(entry.enabled, TrackNames.forCustom(track.name()), 186)), b -> {
-				entry.enabled = !entry.enabled;
-				buildWidgets();
-			}).bounds(left, y, 200, 20).build());
-
-			addRenderableWidget(Button.builder(Component.literal(entry.where().label), b -> {
-				entry.preset = entry.where().next().name();
-				buildWidgets();
-			}).bounds(left + 205, y, 105, 20).build());
-		}
-	}
-
-	private void buildVanillaRows() {
+	private void buildList(List<ListLayout.Placed<Entry>> placed) {
 		int rows = rows();
 		int columns = columns();
 		int totalWidth = columns * LIST_WIDTH + (columns - 1) * 10;
 		int listLeft = this.width / 2 - totalWidth / 2;
 
-		int start = page * perPage();
-		for (int i = 0; i < perPage() && start + i < vanillaRows.size(); i++) {
-			VanillaRow row = vanillaRows.get(start + i);
-			boolean allowed = !config.disabledVanilla.contains(row.name());
-			int column = i / rows;
-			int line = i % rows;
+		for (ListLayout.Placed<Entry> p : placed) {
+			int x = listLeft + (p.slot() / rows) * (LIST_WIDTH + 10);
+			int y = LIST_TOP + (p.slot() % rows) * ROW_HEIGHT;
 
-			addRenderableWidget(Button.builder(Component.literal(label(allowed, row.info(), LIST_WIDTH - 14)), b -> {
-				if (!config.disabledVanilla.remove(row.name())) {
-					config.disabledVanilla.add(row.name());
-				}
-				buildWidgets();
-			}).bounds(listLeft + column * (LIST_WIDTH + 10), LIST_TOP + line * ROW_HEIGHT, LIST_WIDTH, 20).build());
+			if (p.item() instanceof Header header) {
+				addHeader(header, x, y);
+			} else if (p.item() instanceof VanillaSong song) {
+				addVanillaSong(song, x, y);
+			} else if (p.item() instanceof CustomSong song) {
+				addCustomSong(song, x, y);
+			}
 		}
+	}
+
+	private void addHeader(Header header, int x, int y) {
+		int allowed = 0;
+		for (String key : header.keys()) {
+			if (isAllowed(header.custom(), key)) allowed++;
+		}
+		int total = header.keys().size();
+		String mark = allowed == total ? GREEN_CHECK : (allowed == 0 ? RED_CROSS : YELLOW_MIXED);
+		String text = mark + BOLD + header.artist() + RESET + " " + GRAY + "(" + allowed + "/" + total + " allowed)";
+
+		addRenderableWidget(Button.builder(Component.literal(text), b -> {
+			boolean everythingAllowed = true;
+			for (String key : header.keys()) {
+				if (!isAllowed(header.custom(), key)) everythingAllowed = false;
+			}
+			// Mixed or blocked: allow all of this artist's songs. Fully allowed: block them all.
+			for (String key : header.keys()) {
+				setAllowed(header.custom(), key, !everythingAllowed);
+			}
+			buildWidgets();
+		}).bounds(x, y, LIST_WIDTH, 20).build());
+	}
+
+	private void addVanillaSong(VanillaSong song, int x, int y) {
+		boolean allowed = isAllowed(false, song.name());
+		addRenderableWidget(Button.builder(Component.literal(label(allowed, song.info(), LIST_WIDTH - 14)), b -> {
+			setAllowed(false, song.name(), !isAllowed(false, song.name()));
+			buildWidgets();
+		}).bounds(x, y, LIST_WIDTH, 20).build());
+	}
+
+	private void addCustomSong(CustomSong song, int x, int y) {
+		MusicConfig.CustomEntry entry = config.custom.get(song.track().id());
+
+		addRenderableWidget(Button.builder(Component.literal(label(entry.enabled, TrackNames.forCustom(song.track().name()), 186)), b -> {
+			entry.enabled = !entry.enabled;
+			buildWidgets();
+		}).bounds(x, y, 200, 20).build());
+
+		addRenderableWidget(Button.builder(Component.literal(entry.where().label), b -> {
+			entry.preset = entry.where().next().name();
+			buildWidgets();
+		}).bounds(x + 205, y, 105, 20).build());
 	}
 
 	/** "check Title - Artist", with the title shortened if it would not fit in {@code maxPixels}. */
@@ -255,14 +323,14 @@ public final class MusicScreen extends Screen {
 		super.extractRenderState(graphics, mouseX, mouseY, delta);
 
 		drawCentered(graphics, this.title.getString(), 12, 0xFFFFFFFF);
-		drawCentered(graphics, "Page " + (page + 1) + " / " + pageCount(), this.height - 48, 0xFFAAAAAA);
+		drawCentered(graphics, "Page " + (page + 1) + " / " + pages().size(), this.height - 48, 0xFFAAAAAA);
 
 		if (showCustom && customTracks.isEmpty()) {
 			drawCentered(graphics, "No .ogg files found yet.", LIST_TOP + 10, 0xFFFFFFFF);
 			drawCentered(graphics, "Press 'Open folder', drop Ogg Vorbis files in, then press Rescan.", LIST_TOP + 24, 0xFFAAAAAA);
 			drawCentered(graphics, "Tip: name files like 'Artist - Title.ogg' to sort and label them.", LIST_TOP + 38, 0xFFAAAAAA);
 		}
-		if (!showCustom && vanillaRows.isEmpty()) {
+		if (!showCustom && vanillaEntries.isEmpty()) {
 			drawCentered(graphics, "Could not read the vanilla music list (see the game log).", LIST_TOP + 10, 0xFFFF5555);
 		}
 
@@ -270,9 +338,9 @@ public final class MusicScreen extends Screen {
 		if (!status.isEmpty()) {
 			drawCentered(graphics, status, statusY, 0xFFFFFF55);
 		} else if (!packActive) {
-			drawCentered(graphics, "Enable the 'CustomMusic' pack: Options > Resource Packs (after pressing Apply).", statusY, 0xFFFF5555);
+			drawCentered(graphics, "Enable the 'CustomMusic' pack in Options > Resource Packs.", statusY, 0xFFFF5555);
 		} else {
-			drawCentered(graphics, "Sorted by artist. Click a song to allow (\u2714) or block (\u2718) it. Apply saves.", statusY, 0xFFAAAAAA);
+			drawCentered(graphics, "Click a song or an artist to allow (\u2714) or block (\u2718). Apply saves.", statusY, 0xFFAAAAAA);
 		}
 	}
 
