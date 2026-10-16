@@ -1,5 +1,6 @@
 package com.custommusic;
 
+import java.text.Normalizer;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
@@ -137,6 +138,24 @@ public final class TrackNames {
 			if (!artist.isEmpty() && !title.isEmpty()) return new Info(title, artist);
 		}
 		return new Info(name, UNKNOWN_ARTIST);
+	}
+
+	/**
+	 * Search matching: every word typed must appear in the title or artist, ignoring case and accents
+	 * (so "oxygene" finds "Oxyg\u00e8ne"). An empty query matches everything.
+	 */
+	public static boolean matches(Info info, String query) {
+		String q = fold(query).trim();
+		if (q.isEmpty()) return true;
+		String haystack = fold(info.title() + " " + info.artist());
+		for (String word : q.split("\\s+")) {
+			if (!haystack.contains(word)) return false;
+		}
+		return true;
+	}
+
+	private static String fold(String s) {
+		return Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);
 	}
 
 	static String stemOf(String normalized) {
