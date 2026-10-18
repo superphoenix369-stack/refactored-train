@@ -17,7 +17,12 @@ import java.util.Map;
 public final class TrackNames {
 	public static final String UNKNOWN_ARTIST = "Unknown artist";
 
-	public record Info(String title, String artist) {
+	/** {@code seconds} is the song's length, or 0 when it is not known. */
+	public record Info(String title, String artist, int seconds) {
+		public Info(String title, String artist) {
+			this(title, artist, 0);
+		}
+
 		public boolean hasArtist() {
 			return !UNKNOWN_ARTIST.equals(artist);
 		}
@@ -32,7 +37,7 @@ public final class TrackNames {
 	/** A music disc: {@code seconds} is the length the jukebox plays it for (0 if unknown). */
 	public record Disc(String title, String artist, int seconds) {
 		public Info info() {
-			return new Info(title, artist);
+			return new Info(title, artist, seconds);
 		}
 	}
 
@@ -43,92 +48,93 @@ public final class TrackNames {
 		DISCS.put(key, new Disc(title, artist, seconds));
 	}
 
-	private static void add(String stem, String title, String artist) {
-		KNOWN.put(stem, new Info(title, artist));
+	private static void add(String stem, String title, String artist, int seconds) {
+		KNOWN.put(stem, new Info(title, artist, seconds));
 	}
 
 	static {
+		// Lengths are from the Minecraft Wiki's music list.
 		// C418
-		add("aria_math", "Aria Math", "C418");
-		add("biome_fest", "Biome Fest", "C418");
-		add("blind_spots", "Blind Spots", "C418");
-		add("clark", "Clark", "C418");
-		add("danny", "Danny", "C418");
-		add("dreiton", "Dreiton", "C418");
-		add("dry_hands", "Dry Hands", "C418");
-		add("haggstrom", "Haggstrom", "C418");
-		add("haunt_muskie", "Haunt Muskie", "C418");
-		add("key", "Key", "C418");
-		add("living_mice", "Living Mice", "C418");
-		add("mice_on_venus", "Mice on Venus", "C418");
-		add("minecraft", "Minecraft", "C418");
-		add("oxygene", "Oxyg\u00e8ne", "C418");
-		add("subwoofer_lullaby", "Subwoofer Lullaby", "C418");
-		add("sweden", "Sweden", "C418");
-		add("taswell", "Taswell", "C418");
-		add("wet_hands", "Wet Hands", "C418");
-		add("axolotl", "Axolotl", "C418");
-		add("dragon_fish", "Dragon Fish", "C418");
-		add("shuniji", "Shuniji", "C418");
-		add("ballad_of_the_cats", "Ballad of the Cats", "C418");
-		add("concrete_halls", "Concrete Halls", "C418");
-		add("dead_voxel", "Dead Voxel", "C418");
-		add("warmth", "Warmth", "C418");
-		add("boss", "Boss", "C418");
-		add("the_end", "The End", "C418");
-		add("alpha", "Alpha", "C418");
-		add("beginning_2", "Beginning 2", "C418");
-		add("floating_trees", "Floating Trees", "C418");
-		add("moog_city_2", "Moog City 2", "C418");
-		add("mutation", "Mutation", "C418");
+		add("aria_math", "Aria Math", "C418", 309);
+		add("biome_fest", "Biome Fest", "C418", 377);
+		add("blind_spots", "Blind Spots", "C418", 331);
+		add("clark", "Clark", "C418", 191);
+		add("danny", "Danny", "C418", 254);
+		add("dreiton", "Dreiton", "C418", 496);
+		add("dry_hands", "Dry Hands", "C418", 68);
+		add("haggstrom", "Haggstrom", "C418", 204);
+		add("haunt_muskie", "Haunt Muskie", "C418", 360);
+		add("key", "Key", "C418", 65);
+		add("living_mice", "Living Mice", "C418", 177);
+		add("mice_on_venus", "Mice on Venus", "C418", 281);
+		add("minecraft", "Minecraft", "C418", 254);
+		add("oxygene", "Oxyg\u00e8ne", "C418", 65);
+		add("subwoofer_lullaby", "Subwoofer Lullaby", "C418", 208);
+		add("sweden", "Sweden", "C418", 215);
+		add("taswell", "Taswell", "C418", 514);
+		add("wet_hands", "Wet Hands", "C418", 90);
+		add("axolotl", "Axolotl", "C418", 303);
+		add("dragon_fish", "Dragon Fish", "C418", 373);
+		add("shuniji", "Shuniji", "C418", 244);
+		add("ballad_of_the_cats", "Ballad of the Cats", "C418", 274);
+		add("concrete_halls", "Concrete Halls", "C418", 253);
+		add("dead_voxel", "Dead Voxel", "C418", 295);
+		add("warmth", "Warmth", "C418", 238);
+		add("boss", "Boss", "C418", 346);
+		add("the_end", "The End", "C418", 903);
+		add("alpha", "Alpha", "C418", 602);
+		add("beginning_2", "Beginning 2", "C418", 175);
+		add("floating_trees", "Floating Trees", "C418", 244);
+		add("moog_city_2", "Moog City 2", "C418", 179);
+		add("mutation", "Mutation", "C418", 184);
 
 		// Lena Raine
-		add("aerie", "Aerie", "Lena Raine");
-		add("ancestry", "Ancestry", "Lena Raine");
-		add("deeper", "Deeper", "Lena Raine");
-		add("eld_unknown", "Eld Unknown", "Lena Raine");
-		add("endless", "Endless", "Lena Raine");
-		add("firebugs", "Firebugs", "Lena Raine");
-		add("infinite_amethyst", "Infinite Amethyst", "Lena Raine");
-		add("labyrinthine", "Labyrinthine", "Lena Raine");
-		add("left_to_bloom", "Left to Bloom", "Lena Raine");
-		add("one_more_day", "One More Day", "Lena Raine");
-		add("stand_tall", "Stand Tall", "Lena Raine");
-		add("wending", "Wending", "Lena Raine");
-		add("chrysopoeia", "Chrysopoeia", "Lena Raine");
-		add("rubedo", "Rubedo", "Lena Raine");
-		add("so_below", "So Below", "Lena Raine");
+		add("aerie", "Aerie", "Lena Raine", 296);
+		add("ancestry", "Ancestry", "Lena Raine", 343);
+		add("deeper", "Deeper", "Lena Raine", 303);
+		add("eld_unknown", "Eld Unknown", "Lena Raine", 296);
+		add("endless", "Endless", "Lena Raine", 402);
+		add("firebugs", "Firebugs", "Lena Raine", 312);
+		add("infinite_amethyst", "Infinite Amethyst", "Lena Raine", 271);
+		add("labyrinthine", "Labyrinthine", "Lena Raine", 324);
+		add("left_to_bloom", "Left to Bloom", "Lena Raine", 342);
+		add("one_more_day", "One More Day", "Lena Raine", 278);
+		add("stand_tall", "Stand Tall", "Lena Raine", 308);
+		add("wending", "Wending", "Lena Raine", 314);
+		add("chrysopoeia", "Chrysopoeia", "Lena Raine", 243);
+		add("rubedo", "Rubedo", "Lena Raine", 312);
+		add("so_below", "So Below", "Lena Raine", 319);
 
 		// Kumi Tanioka
-		add("an_ordinary_day", "An Ordinary Day", "Kumi Tanioka");
-		add("comforting_memories", "Comforting Memories", "Kumi Tanioka");
-		add("floating_dream", "Floating Dream", "Kumi Tanioka");
-		add("komorebi", "komorebi", "Kumi Tanioka");
-		add("pokopoko", "pokopoko", "Kumi Tanioka");
-		add("yakusoku", "yakusoku", "Kumi Tanioka");
+		add("an_ordinary_day", "An Ordinary Day", "Kumi Tanioka", 331);
+		add("comforting_memories", "Comforting Memories", "Kumi Tanioka", 275);
+		add("floating_dream", "Floating Dream", "Kumi Tanioka", 206);
+		add("komorebi", "komorebi", "Kumi Tanioka", 288);
+		add("pokopoko", "pokopoko", "Kumi Tanioka", 304);
+		add("yakusoku", "yakusoku", "Kumi Tanioka", 271);
 
 		// Aaron Cherof
-		add("a_familiar_room", "A Familiar Room", "Aaron Cherof");
-		add("bromeliad", "Bromeliad", "Aaron Cherof");
-		add("crescent_dunes", "Crescent Dunes", "Aaron Cherof");
-		add("echo_in_the_wind", "Echo in the Wind", "Aaron Cherof");
-		add("featherfall", "Featherfall", "Aaron Cherof");
-		add("puzzlebox", "Puzzlebox", "Aaron Cherof");
-		add("watcher", "Watcher", "Aaron Cherof");
+		add("a_familiar_room", "A Familiar Room", "Aaron Cherof", 241);
+		add("bromeliad", "Bromeliad", "Aaron Cherof", 312);
+		add("crescent_dunes", "Crescent Dunes", "Aaron Cherof", 248);
+		add("echo_in_the_wind", "Echo in the Wind", "Aaron Cherof", 296);
+		add("featherfall", "Featherfall", "Aaron Cherof", 345);
+		add("puzzlebox", "Puzzlebox", "Aaron Cherof", 299);
+		add("watcher", "Watcher", "Aaron Cherof", 332);
 
 		// Amos Roddy
-		add("below_and_above", "Below and Above", "Amos Roddy");
-		add("broken_clocks", "Broken Clocks", "Amos Roddy");
-		add("fireflies", "Fireflies", "Amos Roddy");
-		add("lilypad", "Lilypad", "Amos Roddy");
-		add("os_piano", "O's Piano", "Amos Roddy");
+		add("below_and_above", "Below and Above", "Amos Roddy", 212);
+		add("broken_clocks", "Broken Clocks", "Amos Roddy", 213);
+		add("fireflies", "Fireflies", "Amos Roddy", 155);
+		add("lilypad", "Lilypad", "Amos Roddy", 235);
+		add("os_piano", "O's Piano", "Amos Roddy", 275);
 
 		// fingerspit
-		add("ebb", "Ebb", "fingerspit");
-		add("home", "Home", "fingerspit");
-		add("memories", "Memories", "fingerspit");
-		add("nightly", "Nightly", "fingerspit");
-		add("shores", "Shores", "fingerspit");
+		add("ebb", "Ebb", "fingerspit", 306);
+		add("home", "Home", "fingerspit", 380);
+		add("memories", "Memories", "fingerspit", 245);
+		add("nightly", "Nightly", "fingerspit", 302);
+		add("shores", "Shores", "fingerspit", 320);
 	}
 
 	static {
