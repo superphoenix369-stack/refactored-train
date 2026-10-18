@@ -1,6 +1,7 @@
 package com.custommusic;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
@@ -31,6 +32,9 @@ public final class VanillaCatalog {
 	/** Every individually toggleable track as "namespace:path". */
 	public final SortedSet<String> tracks = new TreeSet<>();
 
+	/** Music disc events (e.g. "music_disc.cat") to their original definition, kept so extras like "subtitle" survive. */
+	public final Map<String, JsonObject> discs = new TreeMap<>();
+
 	public static VanillaCatalog scan(ResourceManager manager) {
 		VanillaCatalog catalog = new VanillaCatalog();
 		Identifier soundsJson = Identifier.fromNamespaceAndPath("minecraft", "sounds.json");
@@ -49,7 +53,12 @@ public final class VanillaCatalog {
 				JsonElement root = JsonParser.parseReader(reader);
 				if (!root.isJsonObject()) continue;
 				for (Map.Entry<String, JsonElement> event : root.getAsJsonObject().entrySet()) {
-					if (!event.getKey().startsWith("music.") || !event.getValue().isJsonObject()) continue;
+					if (!event.getValue().isJsonObject()) continue;
+					if (event.getKey().startsWith("music_disc.")) {
+						catalog.addDisc(event.getKey(), event.getValue().getAsJsonObject());
+						continue;
+					}
+					if (!event.getKey().startsWith("music.")) continue;
 					JsonElement sounds = event.getValue().getAsJsonObject().get("sounds");
 					if (sounds == null || !sounds.isJsonArray()) continue;
 					for (JsonElement entry : sounds.getAsJsonArray()) {
@@ -61,6 +70,19 @@ public final class VanillaCatalog {
 			}
 		}
 		return catalog;
+	}
+
+	/** Remembers the first definition that is not one of our own replacements (the vanilla one). */
+	private void addDisc(String eventKey, JsonObject definition) {
+		if (discs.containsKey(eventKey)) return;
+		JsonElement sounds = definition.get("sounds");
+		if (sounds != null && sounds.isJsonArray()) {
+			for (JsonElement entry : sounds.getAsJsonArray()) {
+				String name = nameOf(entry);
+				if (name != null && normalize(name).startsWith(PackWriter.NAMESPACE + ":")) return;
+			}
+		}
+		discs.put(eventKey, definition);
 	}
 
 	private void addEntry(String eventKey, JsonElement entry, Map<String, Set<String>> seen) {
