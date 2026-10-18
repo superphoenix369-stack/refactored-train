@@ -12,9 +12,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -56,12 +59,28 @@ public final class PackWriter {
 		writePackMeta(pack);
 		clearOldTracks(soundsDir);
 
-		List<CustomTracks.Found> active = new ArrayList<>();
+		Map<String, CustomTracks.Found> byId = new HashMap<>();
+		for (CustomTracks.Found track : tracks) {
+			byId.put(track.id(), track);
+		}
+
+		// A track is copied if it is in the music rotation, or if it replaces a disc.
+		Set<String> usedByDiscs = new HashSet<>();
+		for (Map.Entry<String, String> disc : config.discs.entrySet()) {
+			if (catalog.discs.containsKey(disc.getKey()) && byId.containsKey(disc.getValue())) {
+				usedByDiscs.add(disc.getValue());
+			}
+		}
+
+		List<CustomTracks.Found> active = new ArrayList<>(); // plays in the normal rotation
+		List<CustomTracks.Found> copied = new ArrayList<>(); // has its file in the pack
 		for (CustomTracks.Found track : tracks) {
 			MusicConfig.CustomEntry entry = config.custom.get(track.id());
-			if (entry == null || !entry.enabled) continue;
+			boolean inRotation = entry != null && entry.enabled;
+			if (!inRotation && !usedByDiscs.contains(track.id())) continue;
 			Files.copy(track.file(), soundsDir.resolve(track.id() + ".ogg"), StandardCopyOption.REPLACE_EXISTING);
-			active.add(track);
+			copied.add(track);
+			if (inRotation) active.add(track);
 		}
 
 		JsonObject root = new JsonObject();
@@ -77,9 +96,16 @@ public final class PackWriter {
 			}
 		}
 
+		for (Map.Entry<String, JsonObject> disc : catalog.discs.entrySet()) {
+			String trackId = config.discs.get(disc.getKey());
+			if (trackId != null && byId.containsKey(trackId)) {
+				root.add(disc.getKey(), buildDisc(disc.getValue(), trackId, config.customVolume));
+			}
+		}
+
 		Files.writeString(minecraftDir.resolve("sounds.json"), GSON.toJson(root), StandardCharsets.UTF_8);
-		writeLang(pack, active);
-		return new Result(active.size(), root.size(), fallback);
+		writeLang(pack, copied);
+		return new Result(copied.size(), root.size(), fallback);
 	}
 
 	private static JsonObject buildEvent(String eventKey, List<JsonElement> vanillaEntries, boolean replace,
@@ -102,7 +128,7 @@ public final class PackWriter {
 		for (CustomTracks.Found track : active) {
 			MusicConfig.CustomEntry entry = config.custom.get(track.id());
 			if (entry.where().categories.contains(category)) {
-				sounds.add(soundObject(NAMESPACE + ":" + track.id()));
+				sounds.add(customSoundObject(track.id(), config.customVolume));
 			}
 		}
 
@@ -110,6 +136,33 @@ public final class PackWriter {
 		event.addProperty("replace", replace);
 		event.add("sounds", sounds);
 		return event;
+	}
+
+	/** The disc's original event (keeping extras such as "subtitle") with only its audio swapped. */
+	private static JsonObject buildDisc(JsonObject original, String trackId, int volumePercent) {
+		JsonObject event = new JsonObject();
+		for (Map.Entry<String, JsonElement> property : original.entrySet()) {
+			if (!property.getKey().equals("sounds") && !property.getKey().equals("replace")) {
+				event.add(property.getKey(), property.getValue());
+			}
+		}
+		JsonArray sounds = new JsonArray();
+		sounds.add(customSoundObject(trackId, volumePercent));
+		event.addProperty("replace", true);
+		event.add("sounds", sounds);
+		return event;
+	}
+
+	/**
+	 * One of the player's tracks, with the custom volume applied. 100% writes no "volume" at all (the default).
+	 * The game rejects a volume of 0 and may then discard the whole sounds.json, so 0% becomes a tiny positive value.
+	 */
+	private static JsonObject customSoundObject(String trackId, int volumePercent) {
+		JsonObject sound = soundObject(NAMESPACE + ":" + trackId);
+		if (volumePercent < 100) {
+			sound.addProperty("volume", Math.max(0.001, volumePercent / 100.0));
+		}
+		return sound;
 	}
 
 	private static JsonObject soundObject(String name) {
