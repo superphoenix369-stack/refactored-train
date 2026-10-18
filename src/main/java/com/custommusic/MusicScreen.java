@@ -389,7 +389,7 @@ public final class MusicScreen extends Screen {
 
 	private void addVanillaSong(VanillaSong song, int x, int y) {
 		boolean allowed = !config.disabledVanilla.contains(song.name());
-		addRenderableWidget(Button.builder(Component.literal(label(allowed, song.info(), LIST_WIDTH - 14)), b -> {
+		addRenderableWidget(Button.builder(Component.literal(label(allowed, song.info(), song.info().seconds(), LIST_WIDTH - 14)), b -> {
 			if (!config.disabledVanilla.remove(song.name())) {
 				config.disabledVanilla.add(song.name());
 			}
@@ -400,15 +400,16 @@ public final class MusicScreen extends Screen {
 	private void addCustomSong(CustomTracks.Found track, int x, int y) {
 		MusicConfig.CustomEntry entry = config.custom.get(track.id());
 
-		addRenderableWidget(Button.builder(Component.literal(label(entry.enabled, TrackNames.forCustom(track.name()), 186)), b -> {
+		double seconds = track.info().known() ? track.info().seconds() : 0;
+		addRenderableWidget(Button.builder(Component.literal(label(entry.enabled, TrackNames.forCustom(track.name()), seconds, 201)), b -> {
 			entry.enabled = !entry.enabled;
 			buildWidgets();
-		}).bounds(x, y, 200, 20).build());
+		}).bounds(x, y, 215, 20).build());
 
 		addRenderableWidget(Button.builder(Component.literal(entry.where().label), b -> {
 			entry.preset = entry.where().next().name();
 			buildWidgets();
-		}).bounds(x + 205, y, 105, 20).build());
+		}).bounds(x + 220, y, 90, 20).build());
 	}
 
 	/** One wide button per disc: "Cat - C418 (3:05)  >  Original". Clicking cycles through your tracks. */
@@ -499,10 +500,14 @@ public final class MusicScreen extends Screen {
 		}
 	}
 
-	/** "check Title - Artist", with the title shortened if it would not fit in {@code maxPixels}. */
-	private String label(boolean allowed, TrackNames.Info info, int maxPixels) {
+	/**
+	 * "check Title - Artist (3:05)", with the title shortened if it would not fit in {@code maxPixels}.
+	 * The artist and length are never cut. A length of 0 (or less) means unknown and is left out.
+	 */
+	private String label(boolean allowed, TrackNames.Info info, double seconds, int maxPixels) {
 		String mark = allowed ? GREEN_CHECK : RED_CROSS;
-		String suffix = info.hasArtist() ? " " + GRAY + "- " + info.artist() : "";
+		String time = seconds > 0 ? " (" + TrackNames.formatTime(seconds) + ")" : "";
+		String suffix = GRAY + (info.hasArtist() ? " - " + info.artist() : "") + time;
 
 		String full = mark + info.title() + suffix;
 		if (this.font.width(full) <= maxPixels) return full;
