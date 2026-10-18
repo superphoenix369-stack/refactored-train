@@ -19,9 +19,10 @@ public final class CustomTracks {
 
 	/**
 	 * A usable track: {@code id} is a resource-safe name, {@code file} the original file and
-	 * {@code name} the original file name without ".ogg" (this is what the player sees).
+	 * {@code name} the original file name without ".ogg" (this is what the player sees) and
+	 * {@code info} its length and channel count.
 	 */
-	public record Found(String id, Path file, String name) {}
+	public record Found(String id, Path file, String name, OggInfo info) {}
 
 	public record Result(List<Found> tracks, List<String> skipped) {}
 
@@ -52,7 +53,7 @@ public final class CustomTracks {
 			String baseName = name.substring(0, name.length() - ".ogg".length());
 			String id = uniqueId(sanitize(baseName), usedIds);
 			usedIds.add(id);
-			found.add(new Found(id, file, baseName));
+			found.add(new Found(id, file, baseName, OggInfo.read(file)));
 		}
 		return new Result(found, skipped);
 	}
