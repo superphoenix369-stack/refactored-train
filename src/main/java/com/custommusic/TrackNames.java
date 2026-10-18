@@ -29,7 +29,19 @@ public final class TrackNames {
 		.thenComparing(info -> info.artist().toLowerCase(Locale.ROOT))
 		.thenComparing(info -> info.title().toLowerCase(Locale.ROOT));
 
+	/** A music disc: {@code seconds} is the length the jukebox plays it for (0 if unknown). */
+	public record Disc(String title, String artist, int seconds) {
+		public Info info() {
+			return new Info(title, artist);
+		}
+	}
+
 	private static final Map<String, Info> KNOWN = new HashMap<>();
+	private static final Map<String, Disc> DISCS = new HashMap<>();
+
+	private static void disc(String key, String title, String artist, int seconds) {
+		DISCS.put(key, new Disc(title, artist, seconds));
+	}
 
 	private static void add(String stem, String title, String artist) {
 		KNOWN.put(stem, new Info(title, artist));
@@ -119,7 +131,46 @@ public final class TrackNames {
 		add("shores", "Shores", "fingerspit");
 	}
 
+	static {
+		// Music discs: title, composer and length, from the Minecraft Wiki's music disc list.
+		disc("13", "13", "C418", 178);
+		disc("cat", "cat", "C418", 185);
+		disc("blocks", "blocks", "C418", 345);
+		disc("chirp", "chirp", "C418", 185);
+		disc("far", "far", "C418", 174);
+		disc("mall", "mall", "C418", 197);
+		disc("mellohi", "mellohi", "C418", 96);
+		disc("stal", "stal", "C418", 150);
+		disc("strad", "strad", "C418", 188);
+		disc("ward", "ward", "C418", 251);
+		disc("11", "11", "C418", 71);
+		disc("wait", "wait", "C418", 237);
+		disc("pigstep", "Pigstep", "Lena Raine", 148);
+		disc("otherside", "otherside", "Lena Raine", 195);
+		disc("creator", "Creator", "Lena Raine", 176);
+		disc("creator_music_box", "Creator (Music Box)", "Lena Raine", 73);
+		disc("5", "5", "Samuel \u00c5berg", 178);
+		disc("relic", "Relic", "Aaron Cherof", 219);
+		disc("precipice", "Precipice", "Aaron Cherof", 299);
+		disc("tears", "Tears", "Amos Roddy", 175);
+		disc("lava_chicken", "Lava Chicken", "Hyper Potions", 135);
+		disc("bounce", "Bounce", "fingerspit", 234);
+	}
+
 	private TrackNames() {}
+
+	/** {@code eventKey} looks like "music_disc.cat". Discs the table does not know get a tidied name. */
+	public static Disc discFor(String eventKey) {
+		String suffix = eventKey.startsWith("music_disc.") ? eventKey.substring("music_disc.".length()) : eventKey;
+		Disc known = DISCS.get(suffix);
+		return known != null ? known : new Disc(prettify(suffix), UNKNOWN_ARTIST, 0);
+	}
+
+	/** 185 becomes "3:05". */
+	public static String formatTime(double seconds) {
+		int total = (int) Math.round(seconds);
+		return (total / 60) + ":" + String.format(Locale.ROOT, "%02d", total % 60);
+	}
 
 	/** {@code normalized} looks like "minecraft:music/game/creative/blind_spots". */
 	public static Info forVanilla(String normalized) {
