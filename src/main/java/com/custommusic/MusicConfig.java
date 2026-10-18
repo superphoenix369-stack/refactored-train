@@ -27,6 +27,12 @@ public final class MusicConfig {
 	/** Settings for each custom track, keyed by track id (the sanitized file name). */
 	public Map<String, CustomEntry> custom = new LinkedHashMap<>();
 
+	/** Volume of all custom tracks (music and discs) in percent, 0 to 100. Vanilla music is not affected. */
+	public int customVolume = 100;
+
+	/** Music disc event (e.g. "music_disc.cat") to the id of the custom track that replaces its audio. */
+	public Map<String, String> discs = new LinkedHashMap<>();
+
 	public static final class CustomEntry {
 		public boolean enabled = true;
 		/** Name of a {@link Preset}; stored as a string so the JSON stays readable and forgiving. */
@@ -84,6 +90,8 @@ public final class MusicConfig {
 	private void repairNulls() {
 		if (disabledVanilla == null) disabledVanilla = new LinkedHashSet<>();
 		if (custom == null) custom = new LinkedHashMap<>();
+		if (discs == null) discs = new LinkedHashMap<>();
+		customVolume = Math.max(0, Math.min(100, customVolume));
 		custom.replaceAll((id, entry) -> entry == null ? new CustomEntry() : entry);
 	}
 }
